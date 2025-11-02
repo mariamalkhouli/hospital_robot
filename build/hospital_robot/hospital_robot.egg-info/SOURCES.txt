@@ -11,7 +11,11 @@ setup.py
 hospital_robot/__init__.py
 hospital_robot/app.py
 hospital_robot/motor_control.py
+hospital_robot.egg-info/PKG-INFO
+hospital_robot.egg-info/SOURCES.txt
+hospital_robot.egg-info/dependency_links.txt
+hospital_robot.egg-info/entry_points.txt
+hospital_robot.egg-info/requires.txt
+hospital_robot.egg-info/top_level.txt
+hospital_robot.egg-info/zip-safe
 resource/hospital_robot
-test/test_copyright.py
-test/test_flake8.py
-test/test_pep257.py

@@ -1,0 +1,18 @@
+[1.226s] Invoking command in '/home/hosbot/ros2_ws/build/hospital_robot': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/hosbot/ros2_ws/build/hospital_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/hosbot/ros2_ws/build/hospital_robot/build --no-deps symlink_data
+[1.693s] running develop
+[2.001s] running egg_info
+[2.029s] writing hospital_robot.egg-info/PKG-INFO
+[2.030s] writing dependency_links to hospital_robot.egg-info/dependency_links.txt
+[2.032s] writing entry points to hospital_robot.egg-info/entry_points.txt
+[2.032s] writing requirements to hospital_robot.egg-info/requires.txt
+[2.033s] writing top-level names to hospital_robot.egg-info/top_level.txt
+[2.090s] reading manifest file 'hospital_robot.egg-info/SOURCES.txt'
+[2.091s] writing manifest file 'hospital_robot.egg-info/SOURCES.txt'
+[2.120s] running build_ext
+[2.120s] Creating /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital-robot.egg-link (link to .)
+[2.121s] Installing motor_control script to /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot
+[2.121s] Installing web_server script to /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot
+[2.121s] 
+[2.121s] Installed /home/hosbot/ros2_ws/build/hospital_robot
+[2.121s] running symlink_data
+[2.214s] Invoked command in '/home/hosbot/ros2_ws/build/hospital_robot' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/hosbot/ros2_ws/build/hospital_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/hosbot/ros2_ws/build/hospital_robot/build --no-deps symlink_data

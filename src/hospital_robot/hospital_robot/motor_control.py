@@ -1,19 +1,20 @@
 import rclpy
 from rclpy.node import Node
-# Import Time for consistent ROS 2 clock usage
 from rclpy.time import Time
 from std_msgs.msg import Float32MultiArray, Bool, String
-import time # Kept for utility, but removed from watchdog logic
+import time
 import math
 import os
 from typing import Tuple
 
-# --- Use the compatible lgpio library ---
+# --- Use gpiozero library for cleaner hardware control ---
 try:
-    import lgpio
-    _HAS_LGPIO = True
-except Exception:
-    _HAS_LGPIO = False
+    from gpiozero import Motor
+    _HAS_GPIOZERO = True
+except Exception as e:
+    # This will catch missing libraries on systems without GPIO
+    print(f"GPIOZero library failed to import: {e}")
+    _HAS_GPIOZERO = False
 
 # Utility
 def clamp(v, lo, hi):
@@ -24,13 +25,20 @@ class MotorControlNode(Node):
         super().__init__('motor_control_node')
 
         # ---- Parameters (default pins use BCM numbering) ----
-        self.declare_parameter('left_pwm', 18)
-        self.declare_parameter('left_dir', 23)
+        # NOTE: gpiozero.Motor uses a forward_pin and a backward_pin.
+        # Since the MDD10A uses PWM+DIR, we use the PWM pin as the "forward" pin
+        # and the DIR pin as the "backward" pin. The Motor object is smart enough
+        # to apply PWM to one and hold the other high/low for direction control.
+        # Pin assignment for MDD10A:
+        # LEFT_PWM (Speed) -> gpiozero Motor "forward" pin (Pin 18 BCM)
+        # LEFT_DIR (Direction) -> gpiozero Motor "backward" pin (Pin 23 BCM)
+
+        self.declare_parameter('left_pwm', 12)
+        self.declare_parameter('left_dir', 24)
         self.declare_parameter('right_pwm', 13)
-        self.declare_parameter('right_dir', 25)
+        self.declare_parameter('right_dir', 23)
         self.declare_parameter('estop_gpio', 5)
-        self.declare_parameter('pwm_frequency', 1000)
-        self.declare_parameter('pwm_range', 255)
+        self.declare_parameter('pwm_frequency', 1000) # This setting is ignored by gpiozero, which uses pigpio's default
         self.declare_parameter('max_speed_pct', 100.0)
         self.declare_parameter('heartbeat_timeout', 1.0)
         self.declare_parameter('use_simulation', False)
@@ -41,13 +49,12 @@ class MotorControlNode(Node):
         self.RIGHT_DIR  = int(self.get_parameter('right_dir').value)
         self.ESTOP_GPIO = int(self.get_parameter('estop_gpio').value)
         self.PWM_FREQ   = int(self.get_parameter('pwm_frequency').value)
-        self.PWM_RANGE  = int(self.get_parameter('pwm_range').value)
         self.MAX_SPEED  = float(self.get_parameter('max_speed_pct').value)
         self.HEARTBEAT_TIMEOUT = float(self.get_parameter('heartbeat_timeout').value)
         self.SIM = bool(self.get_parameter('use_simulation').value)
 
-        self.get_logger().info(f"motor_control_node starting (lgpio={_HAS_LGPIO}, sim={self.SIM})")
-        self.get_logger().info(f"Pins L(PWM,DIR)={self.LEFT_PWM},{self.LEFT_DIR}  R(PWM,DIR)={self.RIGHT_PWM},{self.RIGHT_DIR}")
+        self.get_logger().info(f"motor_control_node starting (gpiozero={_HAS_GPIOZERO}, sim={self.SIM})")
+        self.get_logger().info(f"Pins L(PWM,DIR)={self.LEFT_PWM},{self.LEFT_DIR}   R(PWM,DIR)={self.RIGHT_PWM},{self.RIGHT_DIR}")
 
         self._init_hardware()
 
@@ -55,7 +62,7 @@ class MotorControlNode(Node):
         self.sub_estop = self.create_subscription(Bool, '/emergency_stop', self.cb_emergency_stop, 10)
         self.pub_state = self.create_publisher(String, '/motor_state', 1)
 
-        # FIX 1: Initialize the last command time using the ROS 2 Clock
+        self._current_state_str = "L0.0,R0.0"
         self._last_cmd_time = self.get_clock().now()
         self._estop_engaged = False
 
@@ -63,48 +70,42 @@ class MotorControlNode(Node):
         self.timer = self.create_timer(self.timer_period, self._watch_callback)
         self.get_logger().info("ROS 2 Watch Timer started")
 
-        self.left_ticks = 0
-        self.right_ticks = 0
-
     def _init_hardware(self):
         if self.SIM:
             self.get_logger().warning("SIMULATION MODE: not touching GPIO")
-            self.hw = None
+            self.left_motor = None
+            self.right_motor = None
             return
 
-        if not _HAS_LGPIO:
-            self.get_logger().error("lgpio library not available. Running in simulation.")
+        if not _HAS_GPIOZERO:
+            self.get_logger().error("gpiozero library not available. Running in simulation.")
             self.SIM = True
-            self.hw = None
             return
 
         try:
-            # Note: We successfully solved the permission issue to get here!
-            self.lg_h = lgpio.gpiochip_open(0)
-            if self.lg_h < 0:
-                raise RuntimeError(f"Could not open lgpio chip (handle: {self.lg_h})")
+            # Initialize motors using BCM pin numbers
+            # This implicitly initializes the underlying pigpio library
+            # NOTE: For Cytron MDD10A (PWM+DIR), we use the Motor class. 
+            # The first pin (forward) is typically the PWM pin, and the second (backward) is the DIR pin.
+            # We are using the pins defined in the parameters.
+            self.left_motor = Motor(forward=self.LEFT_PWM, backward=self.LEFT_DIR)
+            self.right_motor = Motor(forward=self.RIGHT_PWM, backward=self.RIGHT_DIR)
+            
+            # Start stopped
+            self.left_motor.stop()
+            self.right_motor.stop()
+            
+            self.get_logger().info("gpiozero motors initialized successfully.")
+            self.hw = 'gpiozero'
+
         except Exception as e:
-            self.get_logger().error(f"Failed to initialize lgpio: {e}")
+            self.get_logger().error(f"Failed to initialize gpiozero motors: {e}")
             self.SIM = True
+            self.left_motor = None
+            self.right_motor = None
             self.hw = None
             return
 
-        # Configure direction pins as outputs
-        output_pins = [p for p in (self.LEFT_DIR, self.RIGHT_DIR) if p >= 0]
-        for p in output_pins:
-            lgpio.gpio_claim_output(self.lg_h, p)
-            lgpio.gpio_write(self.lg_h, p, 0)
-
-        # Configure PWM pins: start at 0% duty using tx_pwm
-        lgpio.tx_pwm(self.lg_h, self.LEFT_PWM, self.PWM_FREQ, 0)
-        lgpio.tx_pwm(self.lg_h, self.RIGHT_PWM, self.PWM_FREQ, 0)
-
-        # Configure ESTOP pin as input with pull-up
-        # if self.ESTOP_GPIO >= 0:
-        #    lgpio.gpio_claim_input(self.lg_h, self.ESTOP_GPIO, lgpio.SET_PULL_UP)
-            
-        self.get_logger().info("lgpio initialized successfully for Cytron driver")
-        self.hw = 'lgpio'
 
     def cb_motor_speeds(self, msg: Float32MultiArray):
         try:
@@ -118,10 +119,13 @@ class MotorControlNode(Node):
             self.get_logger().error(f"Failed parse motor_speeds: {e}")
             return
 
+        # Clamp speed to MAX_SPEED (-100 to 100 default)
         left_pct = clamp(left_pct, -self.MAX_SPEED, self.MAX_SPEED)
         right_pct = clamp(right_pct, -self.MAX_SPEED, self.MAX_SPEED)
         
-        # FIX 2: Reset the timer using the ROS 2 Clock
+        # Log the raw speeds received
+        self.get_logger().info(f"Received speeds (clamped): L={left_pct:.1f}, R={right_pct:.1f}")
+        
         self._last_cmd_time = self.get_clock().now()
         
         if not self._estop_engaged:
@@ -139,59 +143,63 @@ class MotorControlNode(Node):
             self._apply_speeds(0.0, 0.0)
 
     def _apply_speeds(self, left_pct: float, right_pct: float):
-        left_dir = left_pct >= 0
-        right_dir = right_pct >= 0
-        left_duty = int(abs(left_pct) * self.PWM_RANGE / 100.0)
-        right_duty = int(abs(right_pct) * self.PWM_RANGE / 100.0)
+        # gpiozero.Motor requires a value between -1.0 (full reverse) and 1.0 (full forward)
+        # We scale the incoming percentage (e.g., -50 to 50) to this range.
+        scale_factor = 1.0 / self.MAX_SPEED
+        left_speed_val = left_pct * scale_factor
+        right_speed_val = 100 * scale_factor
+        
+        # CRITICAL DEBUGGING LOG: Log the scaled values being sent to gpiozero
+        self.get_logger().info(
+            f"Applying HW Speeds (gpiozero scale): L={left_speed_val:.3f} | R={right_speed_val:.3f}"
+        )
 
         if self.SIM or self.hw is None:
-            # If in simulation, log the command but don't publish the state,
-            # so we only publish the state on actual hardware change.
-            self.get_logger().info(f"SIMULATING: L: {left_pct:.1f}% ({left_duty}), R: {right_pct:.1f}% ({right_duty})")
             return
 
-        if self.hw == 'lgpio':
+        if self.hw == 'gpiozero':
             try:
-                lgpio.gpio_write(self.lg_h, self.LEFT_DIR, 1 if left_dir else 0)
-                lgpio.gpio_write(self.lg_h, self.RIGHT_DIR, 1 if right_dir else 0)
-                
-                # PWM duty cycle is expected as a percentage (0 to 100) by lgpio.tx_pwm
-                lgpio.tx_pwm(self.lg_h, self.LEFT_PWM, self.PWM_FREQ, left_duty / self.PWM_RANGE * 100)
-                lgpio.tx_pwm(self.lg_h, self.RIGHT_PWM, self.PWM_FREQ, right_duty / self.PWM_RANGE * 100)
+                # The value is passed to the Motor.value property, which handles direction and PWM duty cycle internally
+                self.left_motor.value = left_speed_val
+                self.right_motor.value = right_speed_val
             except Exception as e:
-                self.get_logger().error(f"lgpio write failed in _apply_speeds: {e}")
-                self.hw = None # Disable hardware interaction if an error occurs
-                self._apply_speeds(0.0, 0.0) # Apply zero speed again after disabling
+                self.get_logger().error(f"gpiozero write failed in _apply_speeds: {e}")
+                # Clean up and disable hardware interaction if an error occurs
+                self._cleanup_motors()
+                self.hw = None 
                 return
         
         s = f"L{left_pct:.1f},R{right_pct:.1f}"
+        self._current_state_str = s
         self.pub_state.publish(String(data=s))
 
     def _watch_callback(self):
         try:
-            # FIX 3: Get current time using the ROS 2 Clock
             now = self.get_clock().now()
-            
-            # Calculate difference in seconds
             time_diff_sec = (now - self._last_cmd_time).nanoseconds / 1e9 
 
             if time_diff_sec > self.HEARTBEAT_TIMEOUT:
-                self.get_logger().warn("Motor command timeout. Stopping motors.")
-                self._apply_speeds(0.0, 0.0)
-            # (Omitted ESTOP check which is currently commented out)
+                if self._current_state_str != "L0.0,R0.0":
+                    self.get_logger().warn("Motor command timeout. Stopping motors.")
+                    self._apply_speeds(0.0, 0.0)
         except Exception as e:
-            self.get_logger().error(f"Watch timer callback exception: {e}")
+            self.get_logger().error(f"Watch timer callback exception: {e}") 
+
+    def _cleanup_motors(self):
+        if self.left_motor:
+            self.left_motor.close()
+        if self.right_motor:
+            self.right_motor.close()
 
     def destroy_node(self):
         self.get_logger().info("Shutting down motor_control node")
         try:
             self._apply_speeds(0.0, 0.0)
             self.timer.cancel()
-            if self.hw == 'lgpio' and self.lg_h >= 0:
-                # Clean up PWM on pins
-                lgpio.tx_pwm(self.lg_h, self.LEFT_PWM, 0, 0)
-                lgpio.tx_pwm(self.lg_h, self.RIGHT_PWM, 0, 0)
-                lgpio.gpiochip_close(self.lg_h)
+            
+            if self.hw == 'gpiozero':
+                self._cleanup_motors()
+                
         except Exception as e:
             self.get_logger().warn(f"Error during cleanup: {e}")
         super().destroy_node()
