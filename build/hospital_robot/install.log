@@ -1,9 +1,13 @@
+/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/app.py
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/motor_control.py
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/__init__.py
+/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/__pycache__/app.cpython-312.pyc
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/__pycache__/motor_control.cpython-312.pyc
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/__pycache__/__init__.cpython-312.pyc
 /home/hosbot/ros2_ws/install/hospital_robot/share/ament_index/resource_index/packages/hospital_robot
 /home/hosbot/ros2_ws/install/hospital_robot/share/hospital_robot/package.xml
+/home/hosbot/ros2_ws/install/hospital_robot/share/hospital_robot/templates
+/home/hosbot/ros2_ws/install/hospital_robot/share/hospital_robot/static
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info/dependency_links.txt
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info/zip-safe
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info/top_level.txt
@@ -12,3 +16,4 @@
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info/PKG-INFO
 /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info/requires.txt
 /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot/motor_control
+/home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot/web_server

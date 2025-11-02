@@ -1,0 +1,14 @@
+body { font-family: "Segoe UI", Roboto, Arial, sans-serif; margin:18px; color:#222; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+header h1 { margin:0; font-size:20px; }
+nav a { color:#0077cc; text-decoration:none; margin-left:8px; }
+.row { display:flex; gap:12px; flex-wrap:wrap; }
+.card { background:#fff; border:1px solid #e0e0e0; padding:12px; border-radius:8px; width:48%; box-shadow: 0 1px 3px rgba(0,0,0,0.03);}
+.card h2 { margin-top:0; }
+.controls button { padding:10px 16px; margin:6px; font-size:16px; }
+.manual-area { display:flex; gap:20px; align-items:center; }
+.controls { text-align:center; }
+#ordersList { list-style:none; padding-left:0; }
+@media (max-width:900px) {
+  .card { width:100%; }
+}

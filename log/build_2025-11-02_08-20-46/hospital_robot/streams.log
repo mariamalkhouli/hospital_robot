@@ -1,0 +1,25 @@
+[1.195s] Invoking command in '/home/hosbot/ros2_ws/src/hospital_robot': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/hosbot/ros2_ws/build/hospital_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/hospital_robot build --build-base /home/hosbot/ros2_ws/build/hospital_robot/build install --record /home/hosbot/ros2_ws/build/hospital_robot/install.log --single-version-externally-managed install_data
+[1.566s] running egg_info
+[1.593s] writing ../../build/hospital_robot/hospital_robot.egg-info/PKG-INFO
+[1.593s] writing dependency_links to ../../build/hospital_robot/hospital_robot.egg-info/dependency_links.txt
+[1.595s] writing entry points to ../../build/hospital_robot/hospital_robot.egg-info/entry_points.txt
+[1.596s] writing requirements to ../../build/hospital_robot/hospital_robot.egg-info/requires.txt
+[1.597s] writing top-level names to ../../build/hospital_robot/hospital_robot.egg-info/top_level.txt
+[1.658s] reading manifest file '../../build/hospital_robot/hospital_robot.egg-info/SOURCES.txt'
+[1.659s] writing manifest file '../../build/hospital_robot/hospital_robot.egg-info/SOURCES.txt'
+[1.659s] running build
+[1.659s] running build_py
+[1.659s] copying hospital_robot/web_interface/app.py -> /home/hosbot/ros2_ws/build/hospital_robot/build/lib/hospital_robot/web_interface
+[1.660s] running install
+[1.669s] running install_lib
+[1.696s] copying /home/hosbot/ros2_ws/build/hospital_robot/build/lib/hospital_robot/web_interface/app.py -> /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/web_interface
+[1.697s] byte-compiling /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/web_interface/app.py to app.cpython-312.pyc
+[1.699s] running install_data
+[1.700s] running install_egg_info
+[1.729s] removing '/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info' (and everything under it)
+[1.730s] Copying ../../build/hospital_robot/hospital_robot.egg-info to /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info
+[1.731s] running install_scripts
+[1.922s] Installing motor_control script to /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot
+[1.922s] Installing web_server script to /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot
+[1.924s] writing list of installed files to '/home/hosbot/ros2_ws/build/hospital_robot/install.log'
+[1.996s] Invoked command in '/home/hosbot/ros2_ws/src/hospital_robot' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com PYTHONPATH=/home/hosbot/ros2_ws/build/hospital_robot/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/hospital_robot build --build-base /home/hosbot/ros2_ws/build/hospital_robot/build install --record /home/hosbot/ros2_ws/build/hospital_robot/install.log --single-version-externally-managed install_data

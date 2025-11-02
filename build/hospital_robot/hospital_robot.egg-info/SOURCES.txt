@@ -9,6 +9,7 @@ setup.py
 ../../build/hospital_robot/hospital_robot.egg-info/top_level.txt
 ../../build/hospital_robot/hospital_robot.egg-info/zip-safe
 hospital_robot/__init__.py
+hospital_robot/app.py
 hospital_robot/motor_control.py
 resource/hospital_robot
 test/test_copyright.py
