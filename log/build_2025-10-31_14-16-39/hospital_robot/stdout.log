@@ -1,0 +1,22 @@
+running egg_info
+writing ../../build/hospital_robot/hospital_robot.egg-info/PKG-INFO
+writing dependency_links to ../../build/hospital_robot/hospital_robot.egg-info/dependency_links.txt
+writing entry points to ../../build/hospital_robot/hospital_robot.egg-info/entry_points.txt
+writing requirements to ../../build/hospital_robot/hospital_robot.egg-info/requires.txt
+writing top-level names to ../../build/hospital_robot/hospital_robot.egg-info/top_level.txt
+reading manifest file '../../build/hospital_robot/hospital_robot.egg-info/SOURCES.txt'
+writing manifest file '../../build/hospital_robot/hospital_robot.egg-info/SOURCES.txt'
+running build
+running build_py
+copying hospital_robot/motor_control.py -> /home/hosbot/ros2_ws/build/hospital_robot/build/lib/hospital_robot
+running install
+running install_lib
+copying /home/hosbot/ros2_ws/build/hospital_robot/build/lib/hospital_robot/motor_control.py -> /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot
+byte-compiling /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot/motor_control.py to motor_control.cpython-312.pyc
+running install_data
+running install_egg_info
+removing '/home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info' (and everything under it)
+Copying ../../build/hospital_robot/hospital_robot.egg-info to /home/hosbot/ros2_ws/install/hospital_robot/lib/python3.12/site-packages/hospital_robot-0.0.0-py3.12.egg-info
+running install_scripts
+Installing motor_control script to /home/hosbot/ros2_ws/install/hospital_robot/lib/hospital_robot
+writing list of installed files to '/home/hosbot/ros2_ws/build/hospital_robot/install.log'

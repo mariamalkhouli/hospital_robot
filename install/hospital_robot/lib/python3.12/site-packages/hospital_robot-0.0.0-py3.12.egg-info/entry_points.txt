@@ -1,0 +1,2 @@
+[console_scripts]
+motor_control = hospital_robot.motor_control:main
