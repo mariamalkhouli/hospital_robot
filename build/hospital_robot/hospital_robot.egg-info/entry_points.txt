@@ -1,3 +1,0 @@
-[console_scripts]
-motor_control = hospital_robot.motor_control:main
-web_server = hospital_robot.app:main
