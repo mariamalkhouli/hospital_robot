@@ -6,119 +6,199 @@
     <title>Hospital Robot Dashboard</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <!-- Your external CSS link is kept for structure, though Tailwind handles the bulk -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Custom styles for professional look */
-        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
-        .card { transition: all 0.3s ease; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-        header { z-index: 10; }
-        #mapWrap { height: 300px; }
-        #mapImg { object-fit: cover; }
-        @media (min-width: 640px) { #mapWrap { height: 400px; } }
-    </style>
 </head>
-<body class="min-h-screen pt-16">
+<body class="bg-gray-100 min-h-screen font-sans p-4">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
 
-    <!-- Fixed Header -->
-    <header class="fixed top-0 left-0 w-full bg-white shadow-lg p-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-blue-800">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-            </svg>
-            Delivery Robot Dashboard
-        </h1>
-        <nav class="space-x-4 text-sm font-semibold">
-            <a href="/" class="text-blue-600 hover:text-blue-800 border-b-2 border-blue-500 pb-1">Dashboard</a>
-            <a href="/manual" class="text-gray-600 hover:text-blue-600">Manual Control</a>
-        </nav>
-    </header>
+    <div class="w-full max-w-6xl mx-auto bg-white shadow-2xl rounded-xl p-6 md:p-10 space-y-8">
+        <header class="text-center pb-4 border-b border-gray-200">
+            <h1 class="text-5xl font-extrabold text-blue-700">HosBot Delivery Control</h1>
+            <p class="text-gray-500 mt-2">Manage orders, monitor status, and control the robot.</p>
+        </header>
 
-    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
-        
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Top Controls Section -->
+        <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 p-4 bg-gray-50 rounded-lg border">
+            <!-- Emergency Stop -->
+            <button id="emergency-stop-btn"
+                class="w-full md:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg transition duration-150 ease-in-out transform hover:scale-105"
+                onclick="sendEmergencyStop()">
+                🚨 EMERGENCY STOP
+            </button>
             
-            <!-- Card 1: Create Delivery Order -->
-            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-md card">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Create Delivery Order</h2>
-                <form id="orderForm" class="space-y-3">
-                    <input name="patient" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Patient / Room" required>
-                    <input name="destination" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Destination (e.g., NurseStation1)" required>
-                    <input name="drawer" type="number" min="1" max="3" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Drawer # (1-3)" required>
-                    <textarea name="contents" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Contents (e.g., Blood Sample, Medications)"></textarea>
-                    <button type="submit" class="w-full bg-blue-500 text-white font-semibold py-2 rounded-lg shadow-md hover:bg-blue-600">Create Order</button>
-                </form>
-                <div id="orderResult" class="mt-4 text-center font-medium"></div>
-            </div>
-
-            <!-- Card 2: Current Map Status -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md card">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Current Map & Status</h2>
-                <div id="mapWrap" class="w-full bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex flex-col justify-center items-center overflow-hidden">
-                    <!-- The source uses Flask's url_for to correctly generate the path to map.png -->
-                    <img id="mapImg" src="{{ url_for('serve_map') }}" alt="Map" onerror="this.onerror=null;this.src='https://placehold.co/800x400/D1D5DB/4B5563?text=Map+Placeholder';" class="w-full h-full object-cover">
-                </div>
-                <div id="mapStatus" class="mt-3 text-sm text-gray-600 text-center">Status: Awaiting first SLAM update.</div>
-            </div>
-            
-        </section>
-
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <!-- Card 3: Queued Orders -->
-            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md card">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Queued Orders</h2>
-                <ul id="ordersList" class="space-y-3 divide-y divide-gray-100 max-h-80 overflow-y-auto">
-                    {% for o in orders %}
-                        <li class="pt-3">
-                            <span class='font-bold text-gray-800'>{{ o.data.destination }}</span> 
-                            — {{ o.data.contents }} 
-                            (<span class='{% if o.status == "QUEUED" %}text-green-500{% else %}text-yellow-500{% endif %}'>{{ o.status }}</span>)
-                        </li>
-                    {% endfor %}
-                    {% if not orders %}
-                        <li class="text-gray-500 text-sm">No orders currently queued. Create one above!</li>
-                    {% endif %}
-                </ul>
-            </div>
-
-            <!-- Card 4: Quick Actions -->
-            <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-md card flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Quick Actions</h2>
-                    <p class="text-sm text-gray-600 mb-4">Immediate controls for safety and maintenance.</p>
-                </div>
-                <div class="space-y-3">
-                    <button id="stopBtn" class="w-full bg-red-600 text-white font-bold py-3 rounded-lg shadow-lg hover:bg-red-700 uppercase tracking-wider">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6m-6 4h6" />
-                        </svg>
-                        Emergency Stop
-                    </button>
-                    <button id="refreshMap" class="w-full bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg hover:bg-gray-300">
-                        Refresh Map
-                    </button>
-                </div>
-            </div>
-
-        </section>
-
-    </main>
-
-    <!-- Modal for feedback -->
-    <div id="statusModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center">
-            <p id="modalMessage" class="font-semibold text-lg mb-4"></p>
-            <button onclick="document.getElementById('statusModal').classList.add('hidden'); document.getElementById('statusModal').classList.remove('flex');" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Close</button>
+            <!-- Manual Control Link -->
+            <a href="/manual" 
+                class="w-full md:w-auto text-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg transition duration-150 ease-in-out transform hover:scale-105">
+                Manual Drive Control →
+            </a>
         </div>
+
+        <!-- Main Layout: Order Form and Queue -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Column 1: New Delivery Order Form -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl border border-gray-200 shadow-md h-fit">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Create New Delivery</h2>
+                
+                <form id="order-form" onsubmit="handleOrderSubmission(event)">
+                    <div class="space-y-4">
+                        
+                        <div>
+                            <label for="destination" class="block text-sm font-medium text-gray-700">Destination (Room/Station)</label>
+                            <input type="text" id="destination" name="destination" required 
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="patient" class="block text-sm font-medium text-gray-700">Patient/Recipient Name</label>
+                            <input type="text" id="patient" name="patient" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="drawer" class="block text-sm font-medium text-gray-700">Robot Drawer ID (1, 2, or 3)</label>
+                            <input type="number" id="drawer" name="drawer" min="1" max="3" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="contents" class="block text-sm font-medium text-gray-700">Contents Summary (e.g., Medicine, Lab Sample)</label>
+                            <input type="text" id="contents" name="contents" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-3 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="submit" 
+                                class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                Submit Order
+                            </button>
+                        </div>
+                        
+                    </div>
+                </form>
+
+                <div id="form-message" class="mt-4 p-3 rounded-lg text-sm text-center hidden"></div>
+            </div>
+
+            <!-- Column 2: Order Queue and Status -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl border border-gray-200 shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Current Order Queue</h2>
+                
+                {% if orders %}
+                    <div class="space-y-4 max-h-96 overflow-y-auto">
+                    {% for order in orders | reverse %}
+                        <div class="p-4 rounded-lg shadow-sm {{ 'bg-yellow-50 border-yellow-300' if order.status == 'QUEUED' else 'bg-green-50 border-green-300' }} border-l-4">
+                            <div class="flex justify-between items-start">
+                                <p class="text-lg font-semibold text-gray-800">{{ order.data.destination }} ({{ order.data.patient }})</p>
+                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-yellow-200 text-yellow-800' if order.status == 'QUEUED' else 'bg-green-200 text-green-800' }}">
+                                    {{ order.status }}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-1">Contents: {{ order.data.contents }} in Drawer {{ order.data.drawer }}</p>
+                            <p class="text-xs text-gray-400 mt-2">ID: {{ order.id | round(2) }}</p>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center text-gray-500 py-8 border-dashed border-2 border-gray-300 rounded-lg">No active orders in the queue.</p>
+                {% endif %}
+            </div>
+            
+        </div>
+
     </div>
 
+    <script>
+        const ORDER_API = '/api/orders';
+        const STOP_API = '/api/stop';
+        const formMessage = document.getElementById('form-message');
 
-    <!-- Your external JS link is kept for structure -->
-    <script src="{{ url_for('static', filename='js/webapp.js') }}"></script>
-    
+        /**
+         * Sends an AJAX request to submit a new order to the ROS node.
+         * @param {Event} e - The form submission event.
+         */
+        async function handleOrderSubmission(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const data = {
+                destination: form.destination.value,
+                patient: form.patient.value,
+                drawer: form.drawer.value,
+                contents: form.contents.value
+            };
+
+            formMessage.className = 'mt-4 p-3 rounded-lg text-sm text-center text-gray-700 bg-gray-200';
+            formMessage.textContent = 'Submitting order...';
+            formMessage.classList.remove('hidden');
+
+            try {
+                const response = await fetch(ORDER_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+
+                if (result.ok) {
+                    formMessage.className = 'mt-4 p-3 rounded-lg text-sm text-center text-green-800 bg-green-100';
+                    formMessage.textContent = 'Order successfully published!';
+                    form.reset();
+                    // Reload the page to show the new order in the queue
+                    setTimeout(() => window.location.reload(), 1000); 
+                } else {
+                    formMessage.className = 'mt-4 p-3 rounded-lg text-sm text-center text-red-800 bg-red-100';
+                    formMessage.textContent = `Error: ${result.error}`;
+                }
+
+            } catch (error) {
+                formMessage.className = 'mt-4 p-3 rounded-lg text-sm text-center text-red-800 bg-red-100';
+                formMessage.textContent = `Connection Error: ${error.message}`;
+            }
+        }
+
+        /**
+         * Sends an AJAX request to stop the robot immediately.
+         */
+        async function sendEmergencyStop() {
+            if (!confirm("Are you sure you want to send the EMERGENCY STOP command?")) {
+                return;
+            }
+
+            const stopButton = document.getElementById('emergency-stop-btn');
+            const originalText = stopButton.textContent;
+            stopButton.textContent = '🛑 Sending Stop...';
+            stopButton.disabled = true;
+
+            try {
+                await fetch(STOP_API, { method: 'POST' });
+                alert("EMERGENCY STOP signal sent successfully!");
+            } catch (error) {
+                alert(`Error sending stop signal: ${error.message}`);
+            } finally {
+                stopButton.textContent = originalText;
+                stopButton.disabled = false;
+            }
+        }
+
+        // Use custom modal for confirmation instead of browser 'confirm'
+        function confirm(message) {
+            return window.confirm(message); // Using window.confirm temporarily for quick testing
+        }
+
+        function alert(message) {
+             console.log(message); // Log to console, or replace with a custom modal display
+        }
+    </script>
 </body>
 </html>

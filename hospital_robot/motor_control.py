@@ -1,7 +1,9 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
-from std_msgs.msg import Float32MultiArray, Bool, String
+from std_msgs.msg import Bool, String
+# Changed to standard topic type for navigation stack compatibility
+from geometry_msgs.msg import Twist 
 import time
 import math
 import os
@@ -24,147 +26,153 @@ class MotorControlNode(Node):
     def __init__(self):
         super().__init__('motor_control_node')
 
-        # ---- Parameters (default pins use BCM numbering) ----
-        # NOTE: gpiozero.Motor uses a forward_pin and a backward_pin.
-        # Since the MDD10A uses PWM+DIR, we use the PWM pin as the "forward" pin
-        # and the DIR pin as the "backward" pin. The Motor object is smart enough
-        # to apply PWM to one and hold the other high/low for direction control.
-        # Pin assignment for MDD10A:
-        # LEFT_PWM (Speed) -> gpiozero Motor "forward" pin (Pin 18 BCM)
-        # LEFT_DIR (Direction) -> gpiozero Motor "backward" pin (Pin 23 BCM)
-
+        # ---- Kinematics Parameters ----
+        # TUNE THESE FOR YOUR ROBOT
+        self.declare_parameter('wheel_radius', 0.0325)  # 65mm / 2 = 32.5mm = 0.0325m
+        self.declare_parameter('wheel_separation', 0.30)  # Distance between centers of the two drive wheels (in meters)
+        
+        self.WHEEL_RADIUS = self.get_parameter('wheel_radius').value
+        self.WHEEL_SEP = self.get_parameter('wheel_separation').value
+        
+        # ---- Hardware Parameters ----
         self.declare_parameter('left_pwm', 12)
         self.declare_parameter('left_dir', 24)
         self.declare_parameter('right_pwm', 13)
         self.declare_parameter('right_dir', 23)
-        self.declare_parameter('estop_gpio', 5)
-        self.declare_parameter('pwm_frequency', 1000) # This setting is ignored by gpiozero, which uses pigpio's default
-        self.declare_parameter('max_speed_pct', 100.0)
-        self.declare_parameter('heartbeat_timeout', 1.0)
+        self.declare_parameter('max_linear_vel', 1.0) # Max Linear Velocity in m/s (TUNE)
+        self.declare_parameter('max_angular_vel', 1.0) # Max Angular Velocity in rad/s (TUNE)
+        self.declare_parameter('max_pwm_percent', 100.0) # Max PWM % (MDD10A supports 100%)
+        self.declare_parameter('heartbeat_timeout', 0.5) # Reduced timeout for safety
         self.declare_parameter('use_simulation', False)
 
-        self.LEFT_PWM   = int(self.get_parameter('left_pwm').value)
-        self.LEFT_DIR   = int(self.get_parameter('left_dir').value)
-        self.RIGHT_PWM  = int(self.get_parameter('right_pwm').value)
-        self.RIGHT_DIR  = int(self.get_parameter('right_dir').value)
-        self.ESTOP_GPIO = int(self.get_parameter('estop_gpio').value)
-        self.PWM_FREQ   = int(self.get_parameter('pwm_frequency').value)
-        self.MAX_SPEED  = float(self.get_parameter('max_speed_pct').value)
+        self.LEFT_PWM     = int(self.get_parameter('left_pwm').value)
+        self.LEFT_DIR     = int(self.get_parameter('left_dir').value)
+        self.RIGHT_PWM    = int(self.get_parameter('right_pwm').value)
+        self.RIGHT_DIR    = int(self.get_parameter('right_dir').value)
+        self.MAX_LIN_VEL  = float(self.get_parameter('max_linear_vel').value)
+        self.MAX_ANG_VEL  = float(self.get_parameter('max_angular_vel').value)
+        self.MAX_PWM_PCT  = float(self.get_parameter('max_pwm_percent').value)
         self.HEARTBEAT_TIMEOUT = float(self.get_parameter('heartbeat_timeout').value)
-        self.SIM = bool(self.get_parameter('use_simulation').value)
+        self.SIM          = bool(self.get_parameter('use_simulation').value)
 
         self.get_logger().info(f"motor_control_node starting (gpiozero={_HAS_GPIOZERO}, sim={self.SIM})")
-        self.get_logger().info(f"Pins L(PWM,DIR)={self.LEFT_PWM},{self.LEFT_DIR}   R(PWM,DIR)={self.RIGHT_PWM},{self.RIGHT_DIR}")
+        self.get_logger().info(f"Kinematics: R={self.WHEEL_RADIUS}, Sep={self.WHEEL_SEP}")
 
         self._init_hardware()
 
-        self.sub_cmd = self.create_subscription(Float32MultiArray, '/motor_speeds', self.cb_motor_speeds, 10)
-        self.sub_estop = self.create_subscription(Bool, '/emergency_stop', self.cb_emergency_stop, 10)
+        # Subscribe to the standard Twist message from Nav2
+        self.sub_cmd = self.create_subscription(Twist, '/cmd_vel', self.cb_cmd_vel, 10)
+        self.sub_estop = self.create_subscription(Bool, '/emergency_stop', self.cb_emergency_stop, 1)
         self.pub_state = self.create_publisher(String, '/motor_state', 1)
 
         self._current_state_str = "L0.0,R0.0"
         self._last_cmd_time = self.get_clock().now()
         self._estop_engaged = False
+        self._last_linear_x = 0.0
+        self._last_angular_z = 0.0
 
         self.timer_period = 0.05
         self.timer = self.create_timer(self.timer_period, self._watch_callback)
         self.get_logger().info("ROS 2 Watch Timer started")
 
     def _init_hardware(self):
-        if self.SIM:
-            self.get_logger().warning("SIMULATION MODE: not touching GPIO")
+        if self.SIM or not _HAS_GPIOZERO:
+            if not _HAS_GPIOZERO:
+                self.get_logger().error("gpiozero library not found. Running in simulation.")
+            else:
+                self.get_logger().warning("SIMULATION MODE: not touching GPIO")
+            self.SIM = True
             self.left_motor = None
             self.right_motor = None
             return
 
-        if not _HAS_GPIOZERO:
-            self.get_logger().error("gpiozero library not available. Running in simulation.")
-            self.SIM = True
-            return
-
         try:
-            # Initialize motors using BCM pin numbers
-            # This implicitly initializes the underlying pigpio library
-            # NOTE: For Cytron MDD10A (PWM+DIR), we use the Motor class. 
-            # The first pin (forward) is typically the PWM pin, and the second (backward) is the DIR pin.
-            # We are using the pins defined in the parameters.
             self.left_motor = Motor(forward=self.LEFT_PWM, backward=self.LEFT_DIR)
             self.right_motor = Motor(forward=self.RIGHT_PWM, backward=self.RIGHT_DIR)
-            
-            # Start stopped
             self.left_motor.stop()
             self.right_motor.stop()
-            
             self.get_logger().info("gpiozero motors initialized successfully.")
             self.hw = 'gpiozero'
-
         except Exception as e:
             self.get_logger().error(f"Failed to initialize gpiozero motors: {e}")
             self.SIM = True
             self.left_motor = None
             self.right_motor = None
             self.hw = None
-            return
 
-
-    def cb_motor_speeds(self, msg: Float32MultiArray):
-        try:
-            data = msg.data
-            if len(data) < 2:
-                self.get_logger().warn("motor_speeds msg malformed (need 2 values)")
-                return
-            left_pct = float(data[0])
-            right_pct = float(data[1])
-        except Exception as e:
-            self.get_logger().error(f"Failed parse motor_speeds: {e}")
-            return
-
-        # Clamp speed to MAX_SPEED (-100 to 100 default)
-        left_pct = clamp(left_pct, -self.MAX_SPEED, self.MAX_SPEED)
-        right_pct = clamp(right_pct, -self.MAX_SPEED, self.MAX_SPEED)
+    def cb_cmd_vel(self, msg: Twist):
+        # Nav2 sends Twist messages: linear.x (forward/backward) and angular.z (rotation)
+        linear_x = clamp(msg.linear.x, -self.MAX_LIN_VEL, self.MAX_LIN_VEL)
+        angular_z = clamp(msg.angular.z, -self.MAX_ANG_VEL, self.MAX_ANG_VEL)
         
-        # Log the raw speeds received
-        self.get_logger().info(f"Received speeds (clamped): L={left_pct:.1f}, R={right_pct:.1f}")
-        
+        self.get_logger().info(f"Received Twist: V={linear_x:.2f} m/s, W={angular_z:.2f} rad/s")
+
         self._last_cmd_time = self.get_clock().now()
+        self._last_linear_x = linear_x
+        self._last_angular_z = angular_z
         
         if not self._estop_engaged:
-            self._apply_speeds(left_pct, right_pct)
+            self._calculate_and_apply_speeds(linear_x, angular_z)
         else:
-            if left_pct != 0.0 or right_pct != 0.0:
-                self.get_logger().warn("Received motor_speeds but ESTOP is engaged; ignoring and commanding 0.")
-            self._apply_speeds(0.0, 0.0) 
+            if linear_x != 0.0 or angular_z != 0.0:
+                 self.get_logger().warn("ESTOP engaged; ignoring Twist and commanding 0.")
+            self._apply_pwm_percent(0.0, 0.0) 
 
     def cb_emergency_stop(self, msg: Bool):
         val = bool(msg.data)
-        self.get_logger().info(f"Emergency stop message received: {val}")
+        self.get_logger().info(f"Emergency stop message received: {val}. Stopping motors.")
         self._estop_engaged = val
-        if val:
-            self._apply_speeds(0.0, 0.0)
+        self._apply_pwm_percent(0.0, 0.0)
+        self._last_linear_x = 0.0
+        self._last_angular_z = 0.0
 
-    def _apply_speeds(self, left_pct: float, right_pct: float):
-        # gpiozero.Motor requires a value between -1.0 (full reverse) and 1.0 (full forward)
-        # We scale the incoming percentage (e.g., -50 to 50) to this range.
-        scale_factor = 1.0 / self.MAX_SPEED
-        left_speed_val = left_pct * scale_factor
-        right_speed_val = 100 * scale_factor
+
+    def _calculate_and_apply_speeds(self, linear_x: float, angular_z: float):
+        # --- Inverse Kinematics ---
+        # Convert robot linear/angular velocity to required wheel speeds (m/s)
+        # Vr = V + (W * L) / 2
+        # Vl = V - (W * L) / 2
+        V_r = linear_x + (angular_z * self.WHEEL_SEP) / 2.0
+        V_l = linear_x - (angular_z * self.WHEEL_SEP) / 2.0
+
+        # Convert wheel linear speed (m/s) to wheel angular velocity (rad/s)
+        # W_wheel = V / R
+        W_l = V_l / self.WHEEL_RADIUS
+        W_r = V_r / self.WHEEL_RADIUS
         
-        # CRITICAL DEBUGGING LOG: Log the scaled values being sent to gpiozero
-        self.get_logger().info(
-            f"Applying HW Speeds (gpiozero scale): L={left_speed_val:.3f} | R={right_speed_val:.3f}"
-        )
+        # --- PWM Mapping ---
+        # The JGB37-555 motors are 267 RPM @ 12V. 
+        # Convert RPM to max angular velocity (rad/s): (267 * 2 * pi) / 60 = 27.98 rad/s
+        MAX_ANGULAR_WHEEL_SPEED = (267.0 * 2.0 * math.pi) / 60.0 
+        
+        # Calculate the required percentage of max physical speed (which translates to PWM duty cycle)
+        # Note: We clamp here to ensure we don't try to exceed the motor's physical limit.
+        left_pct = clamp((W_l / MAX_ANGULAR_WHEEL_SPEED) * self.MAX_PWM_PCT, 
+                         -self.MAX_PWM_PCT, self.MAX_PWM_PCT)
+        right_pct = clamp((W_r / MAX_ANGULAR_WHEEL_SPEED) * self.MAX_PWM_PCT, 
+                          -self.MAX_PWM_PCT, self.MAX_PWM_PCT)
 
+        self.get_logger().info(
+            f"Kinematics Result: L={W_l:.2f} rad/s ({left_pct:.1f}%) | R={W_r:.2f} rad/s ({right_pct:.1f}%)"
+        )
+        
+        self._apply_pwm_percent(left_pct, right_pct)
+
+    def _apply_pwm_percent(self, left_pct: float, right_pct: float):
+        # gpiozero.Motor requires a value between -1.0 (full reverse) and 1.0 (full forward)
+        scale_factor = 1.0 / self.MAX_PWM_PCT
+        left_speed_val = left_pct * scale_factor
+        right_speed_val = right_pct * scale_factor # CORRECTED: Use right_pct
+        
         if self.SIM or self.hw is None:
             return
 
         if self.hw == 'gpiozero':
             try:
-                # The value is passed to the Motor.value property, which handles direction and PWM duty cycle internally
                 self.left_motor.value = left_speed_val
                 self.right_motor.value = right_speed_val
             except Exception as e:
                 self.get_logger().error(f"gpiozero write failed in _apply_speeds: {e}")
-                # Clean up and disable hardware interaction if an error occurs
                 self._cleanup_motors()
                 self.hw = None 
                 return
@@ -181,7 +189,7 @@ class MotorControlNode(Node):
             if time_diff_sec > self.HEARTBEAT_TIMEOUT:
                 if self._current_state_str != "L0.0,R0.0":
                     self.get_logger().warn("Motor command timeout. Stopping motors.")
-                    self._apply_speeds(0.0, 0.0)
+                    self._apply_pwm_percent(0.0, 0.0)
         except Exception as e:
             self.get_logger().error(f"Watch timer callback exception: {e}") 
 
@@ -194,7 +202,7 @@ class MotorControlNode(Node):
     def destroy_node(self):
         self.get_logger().info("Shutting down motor_control node")
         try:
-            self._apply_speeds(0.0, 0.0)
+            self._apply_pwm_percent(0.0, 0.0)
             self.timer.cancel()
             
             if self.hw == 'gpiozero':
