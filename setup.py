@@ -51,6 +51,8 @@ setup(
         'console_scripts': [
             'motor_control = hospital_robot.motor_control:main',
             'web_server = hospital_robot.app:main',
+            'encoder_driver = hospital_robot.encoder_driver_node:main',
+            'ultrasonic_4x_node = hospital_robot.ultrasonic_4x_node:main',
             # --- New Entry Points to create later ---
             'battery_manager = hospital_robot.battery_manager:main',
             'dispenser_control = hospital_robot.dispenser_control:main',

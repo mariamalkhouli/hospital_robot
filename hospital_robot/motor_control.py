@@ -40,7 +40,7 @@ class MotorControlNode(Node):
         self.declare_parameter('right_pwm', 13)
         self.declare_parameter('right_dir', 23)
         self.declare_parameter('max_linear_vel', 1.0) # Max Linear Velocity in m/s (TUNE)
-        self.declare_parameter('max_angular_vel', 1.0) # Max Angular Velocity in rad/s (TUNE)
+        self.declare_parameter('max_angular_vel', 10.0) # Max Angular Velocity in rad/s (TUNE)
         self.declare_parameter('max_pwm_percent', 100.0) # Max PWM % (MDD10A supports 100%)
         self.declare_parameter('heartbeat_timeout', 0.5) # Reduced timeout for safety
         self.declare_parameter('use_simulation', False)
