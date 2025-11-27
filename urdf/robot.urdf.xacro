@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="hospital_bot">
+
+  <!-- ================= DIMENSIONS (Meters) ================= -->
+  <xacro:property name="radius" value="0.20"/>  <!-- 40cm Diameter -->
+  <xacro:property name="height" value="1.20"/>  <!-- 120cm Height -->
+  <xacro:property name="lidar_h" value="0.30"/> <!-- LiDAR height (e.g. 30cm up) -->
+  
+  <!-- SENSOR DIMENSIONS (From your Drawing) -->
+  <xacro:property name="sensor_radius" value="0.0125"/> <!-- 25mm Diameter / 2 -->
+  <xacro:property name="sensor_len" value="0.019"/>     <!-- 19mm Depth -->
+
+  <!-- ================= COLORS ================= -->
+  <material name="white"><color rgba="1 1 1 1"/></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+  <material name="sensor_color"><color rgba="0.2 0.2 0.2 1"/></material> <!-- Dark Grey -->
+
+  <!-- ================= BASE FOOTPRINT ================= -->
+  <link name="base_footprint"/>
+
+  <!-- ================= BASE LINK (The Body) ================= -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${height/2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${height}" radius="${radius}"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${height/2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${height}" radius="${radius}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <!-- Lift body slightly (2cm) for wheel clearance -->
+    <origin xyz="0 0 0.02" rpy="0 0 0"/> 
+  </joint>
+
+  <!-- ================= LIDAR LINK ================= -->
+  <link name="lidar_link">
+    <visual>
+      <geometry><cylinder radius="0.035" length="0.04"/></geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <!-- Position: At front edge, at defined height -->
+    <origin xyz="${radius - 0.03} 0 ${lidar_h}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ================= ULTRASONIC MACRO ================= -->
+  <!-- This is a helper function to create identical sensors easily -->
+  <xacro:macro name="ultrasonic_sensor" params="name">
+    <link name="${name}">
+      <visual>
+        <!-- Rotate 90deg Y so the cylinder points forward like an eye -->
+        <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+        <geometry>
+          <cylinder length="${sensor_len}" radius="${sensor_radius}"/>
+        </geometry>
+        <material name="sensor_color"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <!-- 1. CREATE THE SENSOR LINKS -->
+  <xacro:ultrasonic_sensor name="us_link_1"/>
+  <xacro:ultrasonic_sensor name="us_link_2"/>
+  <xacro:ultrasonic_sensor name="us_link_3"/>
+  <xacro:ultrasonic_sensor name="us_link_4"/>
+
+  <!-- 2. POSITION THEM -->
+
+  <!-- Sensor 1: BOTTOM FRONT (Under LiDAR) -->
+  <joint name="us_joint_1" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_1"/>
+    <!-- 5cm below LiDAR, Poking out of the radius -->
+    <origin xyz="${radius} 0 ${lidar_h - 0.05}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Sensor 2: MIDDLE LEFT (+30 Degrees) -->
+  <joint name="us_joint_2" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_2"/>
+    <!-- Height: 60cm. Math: x=R*cos(30), y=R*sin(30) -->
+    <origin xyz="0.173 0.10 0.60" rpy="0 0 0.523"/>
+  </joint>
+
+  <!-- Sensor 3: MIDDLE RIGHT (-30 Degrees) -->
+  <joint name="us_joint_3" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_3"/>
+    <!-- Height: 60cm. -->
+    <origin xyz="0.173 -0.10 0.60" rpy="0 0 -0.523"/>
+  </joint>
+
+  <!-- Sensor 4: TOP FRONT -->
+  <joint name="us_joint_4" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_4"/>
+    <!-- Height: 1.15m (Near top) -->
+    <origin xyz="${radius} 0 1.15" rpy="0 0 0"/>
+  </joint>
+
+</robot>
