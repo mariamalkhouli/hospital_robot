@@ -1,0 +1,18 @@
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# ROS 2 Build artifacts (Just in case)
+build/
+install/
+log/
+COLCON_IGNORE
+
+# Virtual Environments
+venv/
+.venv/

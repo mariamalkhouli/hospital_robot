@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Robot Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for control buttons */
+        .control-button {
+            transition: all 0.1s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .control-button:active {
+            box-shadow: none;
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans flex flex-col items-center p-4">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <div class="w-full max-w-4xl bg-white shadow-xl rounded-xl p-8 space-y-8">
+        <header class="text-center pb-4 border-b border-gray-200">
+            <h1 class="text-4xl font-extrabold text-blue-800">Manual Teleoperation</h1>
+            <p class="text-gray-500 mt-2">Use the on-screen controls or WASD keys to drive the robot.</p>
+        </header>
+
+        <div id="status-display" class="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg font-mono text-sm text-center">
+            Robot Status: Ready
+        </div>
+        
+        <div class="flex flex-col items-center space-y-6">
+            <h2 class="text-2xl font-semibold text-gray-700">Drive Controls</h2>
+            
+            <div class="flex justify-center space-x-8 text-gray-600">
+                <p><strong>W</strong>: Forward</p>
+                <p><strong>A/D</strong>: Turn</p>
+                <p><strong>S</strong>: Reverse</p>
+                <p><strong>SPACE</strong>: Emergency Stop</p>
+            </div>
+            
+            <div class="grid grid-cols-3 gap-2 w-64 md:w-80 p-4 bg-gray-100 rounded-lg shadow-inner">
+                <div class="col-span-1"></div>
+                <button id="up-btn" class="control-button bg-green-500 hover:bg-green-600 text-white p-4 rounded-xl text-2xl font-bold" data-linear="1.0" data-angular="0.0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    </svg>
+                </button>
+                <div class="col-span-1"></div>
+
+                <button id="left-btn" class="control-button bg-yellow-500 hover:bg-yellow-600 text-white p-4 rounded-xl text-2xl font-bold" data-linear="0.0" data-angular="1.0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </button>
+                <button id="stop-btn" class="control-button bg-red-600 hover:bg-red-700 text-white p-4 rounded-xl text-2xl font-bold">
+                    STOP
+                </button>
+                <button id="right-btn" class="control-button bg-yellow-500 hover:bg-yellow-600 text-white p-4 rounded-xl text-2xl font-bold" data-linear="0.0" data-angular="-1.0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+
+                <div class="col-span-1"></div>
+                <button id="down-btn" class="control-button bg-green-500 hover:bg-green-600 text-white p-4 rounded-xl text-2xl font-bold" data-linear="-1.0" data-angular="0.0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                </button>
+                <div class="col-span-1"></div>
+            </div>
+            
+            <p class="text-gray-500 text-sm italic">Speed set to 1.0 (full speed). The WASD keys also use this speed.</p>
+        </div>
+
+        <div class="pt-6 border-t border-gray-200 text-center">
+            <a href="/" class="text-blue-600 hover:text-blue-800 font-medium">← Back to Main Dashboard</a>
+        </div>
+
+    </div>
+
+    <script>
+        const API_URL = '/api/move';
+        const STOP_URL = '/api/stop';
+        const STATUS_DISPLAY = document.getElementById('status-display');
+        const MAX_SPEED = 1.0; // <-- CORRECTED: Set to 1.0 for full speed
+        let movementInterval = null;
+        let lastCommand = { linear: 0.0, angular: 0.0 };
+        let currentKeysPressed = {};
+
+        function updateStatus(message, isError = false) {
+            STATUS_DISPLAY.textContent = 'Robot Status: ' + message;
+            STATUS_DISPLAY.className = isError 
+                ? 'bg-red-100 border border-red-400 text-red-800 p-4 rounded-lg font-mono text-sm text-center'
+                : 'bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg font-mono text-sm text-center';
+        }
+
+        async function sendCommand(linear_x, angular_z) {
+            // FIX: Ensure payload keys match the Python API function's expected keys
+            const payload = { 
+                linear_x: linear_x, 
+                angular_z: angular_z
+            };
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (result.ok) {
+                    lastCommand = { linear: linear_x, angular: angular_z }; 
+                    updateStatus(`Command: V=${linear_x.toFixed(2)}, W=${angular_z.toFixed(2)}`);
+                } else {
+                    updateStatus(`API Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                updateStatus(`Connection Failed: ${error.message}`, true);
+            }
+        }
+        
+        async function sendStop() {
+              try {
+                const response = await fetch(STOP_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const result = await response.json();
+                
+                if (result.ok) {
+                    lastCommand = { linear: 0.0, angular: 0.0 };
+                    updateStatus(`EMERGENCY STOP (V=0.00, W=0.00)`);
+                } else {
+                    updateStatus(`STOP API Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                updateStatus(`Connection Failed: ${error.message}`, true);
+            }
+        }
+        
+        // --- Keyboard Controls Logic (WASD) ---
+        function calculateTwistFromKeys() {
+            let linear_x = 0.0;
+            let angular_z = 0.0;
+
+            if (currentKeysPressed['w']) { linear_x += MAX_SPEED; }
+            if (currentKeysPressed['s']) { linear_x -= MAX_SPEED; }
+            if (currentKeysPressed['a']) { angular_z += MAX_SPEED; } 
+            if (currentKeysPressed['d']) { angular_z -= MAX_SPEED; } 
+            
+            return { linear_x, angular_z };
+        }
+
+        function startMovementInterval() {
+            if (movementInterval === null) {
+                // Send commands frequently (10Hz) to keep the motor watchdog timer happy
+                movementInterval = setInterval(() => {
+                    const { linear_x, angular_z } = calculateTwistFromKeys();
+                    
+                    if (linear_x !== lastCommand.linear || angular_z !== lastCommand.angular || linear_x !== 0.0 || angular_z !== 0.0) {
+                        sendCommand(linear_x, angular_z);
+                    }
+                }, 100); 
+            }
+        }
+
+        function stopMovementInterval() {
+            if (movementInterval !== null) {
+                clearInterval(movementInterval);
+                movementInterval = null;
+                // Send final stop command
+                sendCommand(0.0, 0.0); 
+            }
+        }
+
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (['w', 'a', 's', 'd'].includes(key) && !currentKeysPressed[key]) {
+                currentKeysPressed[key] = true;
+                e.preventDefault();
+                startMovementInterval();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (['w', 'a', 's', 'd'].includes(key)) {
+                delete currentKeysPressed[key];
+                e.preventDefault();
+                
+                if (Object.keys(currentKeysPressed).length === 0) {
+                    stopMovementInterval();
+                }
+            }
+            if (key === ' ') { // Space bar for instant stop
+                sendStop();
+                stopMovementInterval();
+                e.preventDefault();
+            }
+        });
+        
+        // --- On-Screen Button Controls Logic ---
+        document.querySelectorAll('.control-button').forEach(button => {
+            const linear = parseFloat(button.dataset.linear) || 0.0;
+            const angular = parseFloat(button.dataset.angular) || 0.0;
+            
+            if (button.id === 'stop-btn') {
+                button.addEventListener('click', () => sendStop());
+                return;
+            }
+
+            let isMoving = false;
+            let moveTimeout = null;
+            
+            const startMove = () => {
+                if (isMoving) return;
+                isMoving = true;
+                sendCommand(linear, angular);
+                
+                moveTimeout = setInterval(() => {
+                    sendCommand(linear, angular);
+                }, 100);
+            };
+
+            const stopMove = () => {
+                if (!isMoving) return;
+                isMoving = false;
+                if (moveTimeout) {
+                    clearInterval(moveTimeout);
+                    moveTimeout = null;
+                }
+                sendCommand(0.0, 0.0);
+            };
+
+            // Use combination of mouse and touch events for responsiveness
+            button.addEventListener('mousedown', startMove);
+            document.addEventListener('mouseup', stopMove);
+            
+            button.addEventListener('touchstart', (e) => { e.preventDefault(); startMove(); }); 
+            document.addEventListener('touchend', stopMove);
+            
+            button.addEventListener('mouseleave', stopMove);
+        });
+
+        updateStatus("Ready. Press W/A/S/D or use buttons.");
+
+    </script>
+</body>
+</html>

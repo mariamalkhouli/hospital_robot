@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="hospital_bot">
+
+  <!-- ================= DIMENSIONS (Meters) ================= -->
+  <xacro:property name="radius" value="0.20"/>  <!-- 40cm Diameter -->
+  <xacro:property name="height" value="1.20"/>  <!-- 120cm Height -->
+  <xacro:property name="lidar_h" value="0.262"/> <!-- LiDAR height -->
+  
+  <!-- ULTRASONIC SENSOR DIMENSIONS -->
+  <xacro:property name="sensor_radius" value="0.0125"/> 
+  <xacro:property name="sensor_len" value="0.019"/>
+
+  <!-- ================= COLORS ================= -->
+  <material name="white"><color rgba="1 1 1 1"/></material>
+  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
+  <material name="sensor_color"><color rgba="0.2 0.2 0.2 1"/></material>
+  <material name="red"><color rgba="0.8 0.0 0.0 1"/></material>
+
+  <!-- ================= BASE FOOTPRINT ================= -->
+  <link name="base_footprint"/>
+
+  <!-- ================= BASE LINK (The Body) ================= -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 ${height/2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${height}" radius="${radius}"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${height/2}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${height}" radius="${radius}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.0125" rpy="0 0 0"/> 
+  </joint>
+
+
+  <!-- ================= LIDAR LINK ================= -->
+  <link name="laser_frame">
+    <visual>
+      <origin xyz="0 0 0.01675" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.0176" length="0.0335"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.01675" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.039 0.039 0.0335"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_frame"/>
+
+    <origin xyz="${radius - 0.08} 0 ${lidar_h}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ================= IMU LINK ================= -->
+  <link name="imu_link"/>
+  
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.20" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ================= ToF CLIFF SENSOR ================= -->
+  <link name="tof_link">
+    <visual>
+      <geometry><box size="0.01 0.02 0.01"/></geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="tof_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="tof_link"/>
+    <origin xyz="${radius - 0.01} 0 0.085" rpy="0 0.785 0"/>
+  </joint>
+
+<!-- ================= ULTRASONIC SENSORS ================= -->
+  
+  <xacro:macro name="ultrasonic_sensor" params="name">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 1.5708 0"/>
+        <geometry>
+          <cylinder length="${sensor_len}" radius="${sensor_radius}"/>
+        </geometry>
+        <material name="sensor_color"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <xacro:ultrasonic_sensor name="us_link_1"/>
+  <xacro:ultrasonic_sensor name="us_link_2"/>
+  <xacro:ultrasonic_sensor name="us_link_3"/>
+  <xacro:ultrasonic_sensor name="us_link_4"/>
+
+  <!-- ================= SENSOR POSITIONS ================= -->
+
+  <joint name="us_joint_1" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_1"/>
+    <origin xyz="${radius} 0 0.34" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="us_joint_2" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_2"/>
+    <origin xyz="0.153 0.128 0.34" rpy="0 0 0.698"/>
+  </joint>
+
+  <joint name="us_joint_3" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_3"/>
+    <origin xyz="0.153 -0.128 0.34" rpy="0 0 -0.698"/>
+  </joint>
+
+  <joint name="us_joint_4" type="fixed">
+    <parent link="base_link"/>
+    <child link="us_link_4"/>
+    <origin xyz="${radius} 0 0.70" rpy="0 0 0"/>
+  </joint>
+
+</robot>
